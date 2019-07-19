@@ -1,3 +1,4 @@
+#!/usr/bin/python3.6
 # Find problem statement here https://gist.github.com/mukundmr/c546a8ad8d8bf52cda163824f2eefb88
 
 class OrangeState(object):
@@ -10,6 +11,8 @@ class TheOrangeMatrix(object):
         self.array = array
         self.no_of_rows = m
         self.no_of_cols = n       
+        self.unknown_x = 10000 # base value
+        self.rotten_x = 1000  # base value
 
     def get_cell_value(self, i, j, direction):
         array, m, n = self.array, self.no_of_rows - 1, self.no_of_cols -1
@@ -68,57 +71,61 @@ class TheOrangeMatrix(object):
         else:
             return False
 
-    def cannot_rot_at_all(self, i, j):
-        orange_north = self.get_cell_value(i, j, "north")
-        orange_south = self.get_cell_value(i, j, "south")
-        orange_east = self.get_cell_value(i, j, "east")
-        orange_west = self.get_cell_value(i, j, "west")
-        orange_north_east = self.get_cell_value(i, j, "northeast")
-        orange_north_west = self.get_cell_value(i, j, "northwest")
-        orange_south_east = self.get_cell_value(i, j, "northeast")
-        orange_south_west = self.get_cell_value(i, j, "northwest")
-        
-        empty_cell = OrangeState.VOID
-        if orange_north == empty_cell and orange_south == empty_cell and \
-            orange_east == empty_cell and orange_west == empty_cell and \
-            orange_north_east == empty_cell and orange_north_west == empty_cell and \
-            orange_south_east == empty_cell and orange_south_west == empty_cell:
-            return True
-        else:
-            return False
-
     def get_largest_neighbour(self, i, j):
-        orange_north = self.get_cell_value(i, j, "north")
-        orange_south = self.get_cell_value(i, j, "south")
-        orange_east = self.get_cell_value(i, j, "east")
-        orange_west = self.get_cell_value(i, j, "west")
-        orange_north_east = self.get_cell_value(i, j, "northeast")
-        orange_north_west = self.get_cell_value(i, j, "northwest")
-        orange_south_east = self.get_cell_value(i, j, "northeast")
-        orange_south_west = self.get_cell_value(i, j, "northwest")
+        neighbour_oranges = []
+        for direction in ['north', 'south', 'east', 'west', 'northeast', 'northwest', 'southeast', 'southwest']:
+            neighbour_oranges.append(self.get_cell_value(i, j, direction))
 
-        return max([orange_north, orange_south, orange_east, orange_south,
-            orange_north_east, orange_north_west, orange_south_east, orange_south_west])
+        def is_rotten_neighbour(x):
+            return x > self.rotten_x and x < self.unknown_x
+
+        def rotten_neighbour(x):
+            return x if x > self.rotten_x and x < self.unknown_x else 0
+
+        # if we have any rotten neighbours then return the maximum among them.
+        # otherwise return the maximum of the neighbours
+        any_rotten_neighbour = any([is_rotten_neighbour(x) for x in neighbour_oranges])
+        if any_rotten_neighbour is True:
+            largest_neighbour = max([rotten_neighbour(x) for x in neighbour_oranges])
+        else:
+            largest_neighbour = max(neighbour_oranges)
+
+        return largest_neighbour
 
     def get_time_to_rot(self):
-        time_to_rot = 0
+        time_to_rot = -1
+        array = self.array
         for i in range(0, self.no_of_rows):
             for j in range(0, self.no_of_cols):
-                fresh_orange = (array[i][j] == OrangeState.FRESH)
-                if fresh_orange and self.can_rot_immediately(i, j):
-                    array[i][j] = OrangeState.ROTTEN + 1
-                    time_to_rot = 1 if time_to_rot == 0 else time_to_rot
-                elif fresh_orange and self.cannot_rot_at_all(i, j):
-                    return -1
-                elif fresh_orange:
+                if (array[i][j] == OrangeState.FRESH):  # process only fresh oranges
                     largest_neighbour = self.get_largest_neighbour(i, j)
-                    time_to_rot = largest_neighbour - 1 if time_to_rot < largest_neighbour else time_to_rot
-
-        return -1 if time_to_rot == 0 else time_to_rot
+                    if largest_neighbour == OrangeState.VOID:
+                        return -1
+                    elif largest_neighbour == OrangeState.ROTTEN:
+                        # the immediate orange takes one unit of time to rot
+                        array[i][j] = self.rotten_x + 1
+                        time_to_rot = max(1, time_to_rot)
+                    elif largest_neighbour == OrangeState.FRESH:
+                        # we are not sure how many unit of time this is going to take to rot
+                        array[i][j] = self.unknown_x + 1
+                    else:
+                        if self.can_rot_immediately(i, j):
+                            # This orange will be rotting immediately so deduce the time
+                            if largest_neighbour > self.unknown_x:
+                                array[i][j] = largest_neighbour + 1 
+                                time_to_rot = max(largest_neighbour - self.unknown_x + 1, time_to_rot)
+                            else:
+                                array[i][j] = largest_neighbour
+                                time_to_rot = max(largest_neighbour - self.rotten_x, time_to_rot)
+                        else:
+                            array[i][j] = largest_neighbour + 1
+                            if array[i][j] > self.rotten_x and array[i][j] < self.unknown_x:
+                                time_to_rot = max(array[i][j] - self.rotten_x, time_to_rot)
+        return time_to_rot
 
 
 # Note: I have not considered the complexity for the input.
-# The complexity is only considered for the processing of the actual problem which is O(m * n)
+# The complexity is only considered for the processing of the actual problem which is O(m * n * 8)
 # Also note that there is minimal or no error handling, so expect failures for some scenrios
 if __name__ == "__main__":
     no_of_test_cases = int(input())
